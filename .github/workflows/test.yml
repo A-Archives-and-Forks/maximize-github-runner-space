@@ -120,6 +120,82 @@ jobs:
             exit 1
           fi
 
+  output-contract:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        scenario:
+          - name: custom
+            cleanup_profile: custom
+            remove_codeql: "true"
+            skip_components: ""
+            expected_component: codeql
+          - name: max
+            cleanup_profile: max
+            remove_codeql: "false"
+            skip_components: docker-engine
+            expected_component: dotnet
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Run action and capture outputs
+        id: cleanup
+        uses: ./
+        with:
+          cleanup-profile: ${{ matrix.scenario.cleanup_profile }}
+          remove-codeql: ${{ matrix.scenario.remove_codeql }}
+          skip-components: ${{ matrix.scenario.skip_components }}
+
+      - name: Verify structured outputs
+        shell: bash
+        env:
+          BEFORE_AVAILABLE_BYTES: ${{ steps.cleanup.outputs.before-available-bytes }}
+          AFTER_AVAILABLE_BYTES: ${{ steps.cleanup.outputs.after-available-bytes }}
+          RECLAIMED_BYTES: ${{ steps.cleanup.outputs.reclaimed-bytes }}
+          CLEANUP_PROFILE_USED: ${{ steps.cleanup.outputs.cleanup-profile }}
+          EXECUTED_COMPONENTS: ${{ steps.cleanup.outputs.executed-components }}
+          EXPECTED_PROFILE: ${{ matrix.scenario.cleanup_profile }}
+          EXPECTED_COMPONENT: ${{ matrix.scenario.expected_component }}
+        run: |
+          set -euo pipefail
+
+          if ! [[ "$BEFORE_AVAILABLE_BYTES" =~ ^[0-9]+$ ]]; then
+            echo "before-available-bytes must be numeric, got '$BEFORE_AVAILABLE_BYTES'"
+            exit 1
+          fi
+
+          if ! [[ "$AFTER_AVAILABLE_BYTES" =~ ^[0-9]+$ ]]; then
+            echo "after-available-bytes must be numeric, got '$AFTER_AVAILABLE_BYTES'"
+            exit 1
+          fi
+
+          if ! [[ "$RECLAIMED_BYTES" =~ ^-?[0-9]+$ ]]; then
+            echo "reclaimed-bytes must be numeric, got '$RECLAIMED_BYTES'"
+            exit 1
+          fi
+
+          if [ "$CLEANUP_PROFILE_USED" != "$EXPECTED_PROFILE" ]; then
+            echo "Expected cleanup-profile '$EXPECTED_PROFILE', got '$CLEANUP_PROFILE_USED'"
+            exit 1
+          fi
+
+          if [ -z "$EXECUTED_COMPONENTS" ]; then
+            echo "executed-components must not be empty"
+            exit 1
+          fi
+
+          if ! [[ ",$EXECUTED_COMPONENTS," == *",$EXPECTED_COMPONENT,"* ]]; then
+            echo "Expected executed-components to include '$EXPECTED_COMPONENT', got '$EXECUTED_COMPONENTS'"
+            exit 1
+          fi
+
+          expected_reclaimed=$((AFTER_AVAILABLE_BYTES - BEFORE_AVAILABLE_BYTES))
+          if [ "$RECLAIMED_BYTES" -ne "$expected_reclaimed" ]; then
+            echo "Expected reclaimed-bytes to be '$expected_reclaimed', got '$RECLAIMED_BYTES'"
+            exit 1
+          fi
+
   invalid-input-validation:
     runs-on: ubuntu-latest
     strategy:

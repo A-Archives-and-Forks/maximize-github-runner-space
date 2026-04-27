@@ -236,18 +236,39 @@ inputs:
     required: false
     default: "false"
 
+outputs:
+  before-available-bytes:
+    description: "Available bytes on / before cleanup starts."
+    value: ${{ steps.structured-outputs.outputs.before_available_bytes }}
+  after-available-bytes:
+    description: "Available bytes on / after cleanup completes."
+    value: ${{ steps.structured-outputs.outputs.after_available_bytes }}
+  reclaimed-bytes:
+    description: "Net bytes reclaimed on / (after - before)."
+    value: ${{ steps.structured-outputs.outputs.reclaimed_bytes }}
+  cleanup-profile:
+    description: "Normalized cleanup profile used for the run (max or custom)."
+    value: ${{ steps.structured-outputs.outputs.cleanup_profile }}
+  executed-components:
+    description: "Comma-separated cleanup components scheduled for execution."
+    value: ${{ steps.structured-outputs.outputs.executed_components }}
+
 runs:
   using: "composite"
   steps:
     - name: Disk Space Report (BEFORE)
+      id: disk-before
       shell: bash
       run: |
         set -euo pipefail
+        before_available_bytes=$(df --output=avail -B1 / | tail -n1 | tr -d '[:space:]')
         echo "Available storage:"
         sudo df -h
         echo
+        echo "available_bytes=${before_available_bytes}" >> "$GITHUB_OUTPUT"
 
     - name: Initialize Cleanup Plan
+      id: init-plan
       shell: bash
       env:
         CLEANUP_PROFILE: ${{ inputs.cleanup-profile }}
@@ -700,6 +721,62 @@ runs:
         [[ "$COMPONENT_LARGE_PACKAGES" == "true" ]] && echo -n "large-packages "
         echo
         echo
+
+        scheduled_components=()
+        [[ "$COMPONENT_DOTNET" == "true" ]] && scheduled_components+=("dotnet")
+        [[ "$COMPONENT_ANDROID" == "true" ]] && scheduled_components+=("android")
+        [[ "$COMPONENT_HASKELL" == "true" ]] && scheduled_components+=("haskell")
+        [[ "$COMPONENT_CODEQL" == "true" ]] && scheduled_components+=("codeql")
+        [[ "$COMPONENT_CACHED_TOOLS" == "true" ]] && scheduled_components+=("cached-tools")
+        [[ "$COMPONENT_SWAPFILE" == "true" ]] && scheduled_components+=("swapfile")
+        [[ "$COMPONENT_SWIFT" == "true" ]] && scheduled_components+=("swift")
+        [[ "$COMPONENT_JULIA" == "true" ]] && scheduled_components+=("julia")
+        [[ "$COMPONENT_JAVA" == "true" ]] && scheduled_components+=("java")
+        [[ "$COMPONENT_BROWSERS" == "true" ]] && scheduled_components+=("browsers")
+        [[ "$COMPONENT_POWERSHELL" == "true" ]] && scheduled_components+=("powershell")
+        [[ "$COMPONENT_MINICONDA" == "true" ]] && scheduled_components+=("miniconda")
+        [[ "$COMPONENT_HOMEBREW" == "true" ]] && scheduled_components+=("homebrew")
+        [[ "$COMPONENT_VCPKG" == "true" ]] && scheduled_components+=("vcpkg")
+        [[ "$COMPONENT_CACHED_GO" == "true" ]] && scheduled_components+=("cached-go")
+        [[ "$COMPONENT_CACHED_NODE" == "true" ]] && scheduled_components+=("cached-node")
+        [[ "$COMPONENT_CACHED_PYTHON" == "true" ]] && scheduled_components+=("cached-python")
+        [[ "$COMPONENT_CACHED_PYPY" == "true" ]] && scheduled_components+=("cached-pypy")
+        [[ "$COMPONENT_CACHED_RUBY" == "true" ]] && scheduled_components+=("cached-ruby")
+        [[ "$COMPONENT_CHROME" == "true" ]] && scheduled_components+=("chrome")
+        [[ "$COMPONENT_CHROMIUM" == "true" ]] && scheduled_components+=("chromium")
+        [[ "$COMPONENT_EDGE" == "true" ]] && scheduled_components+=("edge")
+        [[ "$COMPONENT_FIREFOX" == "true" ]] && scheduled_components+=("firefox")
+        [[ "$COMPONENT_WEBDRIVERS" == "true" ]] && scheduled_components+=("webdrivers")
+        [[ "$COMPONENT_SELENIUM" == "true" ]] && scheduled_components+=("selenium")
+        [[ "$COMPONENT_AWS_CLI" == "true" ]] && scheduled_components+=("aws-cli")
+        [[ "$COMPONENT_AWS_SAM_CLI" == "true" ]] && scheduled_components+=("aws-sam-cli")
+        [[ "$COMPONENT_AZURE_CLI" == "true" ]] && scheduled_components+=("azure-cli")
+        [[ "$COMPONENT_GH_CLI" == "true" ]] && scheduled_components+=("gh-cli")
+        [[ "$COMPONENT_GCLOUD_CLI" == "true" ]] && scheduled_components+=("gcloud-cli")
+        [[ "$COMPONENT_AZCOPY" == "true" ]] && scheduled_components+=("azcopy")
+        [[ "$COMPONENT_KUBECTL" == "true" ]] && scheduled_components+=("kubectl")
+        [[ "$COMPONENT_HELM" == "true" ]] && scheduled_components+=("helm")
+        [[ "$COMPONENT_KIND" == "true" ]] && scheduled_components+=("kind")
+        [[ "$COMPONENT_MINIKUBE" == "true" ]] && scheduled_components+=("minikube")
+        [[ "$COMPONENT_KUSTOMIZE" == "true" ]] && scheduled_components+=("kustomize")
+        [[ "$COMPONENT_DOCKER_ENGINE" == "true" ]] && scheduled_components+=("docker-engine")
+        [[ "$COMPONENT_BUILDAH" == "true" ]] && scheduled_components+=("buildah")
+        [[ "$COMPONENT_PODMAN" == "true" ]] && scheduled_components+=("podman")
+        [[ "$COMPONENT_MAVEN" == "true" ]] && scheduled_components+=("maven")
+        [[ "$COMPONENT_GRADLE" == "true" ]] && scheduled_components+=("gradle")
+        [[ "$COMPONENT_ANT" == "true" ]] && scheduled_components+=("ant")
+        [[ "$COMPONENT_PHP" == "true" ]] && scheduled_components+=("php")
+        [[ "$COMPONENT_RUST" == "true" ]] && scheduled_components+=("rust")
+        [[ "$COMPONENT_POSTGRESQL" == "true" ]] && scheduled_components+=("postgresql")
+        [[ "$COMPONENT_MYSQL" == "true" ]] && scheduled_components+=("mysql")
+        [[ "$COMPONENT_APACHE" == "true" ]] && scheduled_components+=("apache")
+        [[ "$COMPONENT_NGINX" == "true" ]] && scheduled_components+=("nginx")
+        [[ "$COMPONENT_DOCKER_IMAGES" == "true" ]] && scheduled_components+=("docker-images")
+        [[ "$COMPONENT_LARGE_PACKAGES" == "true" ]] && scheduled_components+=("large-packages")
+
+        scheduled_components_csv=$(IFS=,; echo "${scheduled_components[*]}")
+        echo "cleanup_profile=${CLEANUP_PROFILE}" >> "$GITHUB_OUTPUT"
+        echo "executed_components=${scheduled_components_csv}" >> "$GITHUB_OUTPUT"
 
     - name: Parallel File System Cleanup
       shell: bash
@@ -1397,9 +1474,29 @@ runs:
         rm -f /tmp/total_ops /tmp/completed_ops /tmp/completed_ops.lock
 
     - name: Disk Space Report (AFTER)
+      id: disk-after
       shell: bash
       run: |
         set -euo pipefail
+        after_available_bytes=$(df --output=avail -B1 / | tail -n1 | tr -d '[:space:]')
         echo "Available storage:"
         sudo df -h
         echo
+        echo "available_bytes=${after_available_bytes}" >> "$GITHUB_OUTPUT"
+
+    - name: Emit Structured Outputs
+      id: structured-outputs
+      shell: bash
+      env:
+        BEFORE_AVAILABLE_BYTES: ${{ steps.disk-before.outputs.available_bytes }}
+        AFTER_AVAILABLE_BYTES: ${{ steps.disk-after.outputs.available_bytes }}
+        CLEANUP_PROFILE_USED: ${{ steps.init-plan.outputs.cleanup_profile }}
+        EXECUTED_COMPONENTS: ${{ steps.init-plan.outputs.executed_components }}
+      run: |
+        set -euo pipefail
+        reclaimed_bytes=$((AFTER_AVAILABLE_BYTES - BEFORE_AVAILABLE_BYTES))
+        echo "before_available_bytes=${BEFORE_AVAILABLE_BYTES}" >> "$GITHUB_OUTPUT"
+        echo "after_available_bytes=${AFTER_AVAILABLE_BYTES}" >> "$GITHUB_OUTPUT"
+        echo "reclaimed_bytes=${reclaimed_bytes}" >> "$GITHUB_OUTPUT"
+        echo "cleanup_profile=${CLEANUP_PROFILE_USED}" >> "$GITHUB_OUTPUT"
+        echo "executed_components=${EXECUTED_COMPONENTS}" >> "$GITHUB_OUTPUT"

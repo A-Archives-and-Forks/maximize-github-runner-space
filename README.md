@@ -14,6 +14,7 @@ This action removes optional preinstalled SDKs, toolchains, and caches so your w
 - [Quick start](#quick-start)
 - [Cleanup Profiles](#cleanup-profiles)
 - [Inputs reference](#inputs-reference)
+- [Outputs reference](#outputs-reference)
 - [Compatibility](#compatibility)
 - [Contributing](#contributing)
 - [Migration Guide](#migration-guide)
@@ -181,6 +182,36 @@ All `remove-*` inputs are optional toggles. In `cleanup-profile: max`, every com
 | `cleanup-profile` | `max`   | Cleanup mode: `max` (default) or `custom`.                                                    |
 | `skip-components` | N/A     | Comma-separated components to keep when `cleanup-profile=max`.                                |
 | `swapfile-size`   | empty   | Optional swapfile size (`0`, `1.5GiB`, `512MiB`, or a plain GiB value like `2`). Leaves swap untouched when omitted. |
+
+## Outputs reference
+
+The action now emits machine-readable outputs so later workflow steps can branch on actual cleanup results.
+
+| Output                   | Description                                                     |
+| ------------------------ | --------------------------------------------------------------- |
+| `before-available-bytes` | Available bytes on `/` before cleanup starts.                   |
+| `after-available-bytes`  | Available bytes on `/` after cleanup completes.                 |
+| `reclaimed-bytes`        | Net bytes reclaimed on `/` (`after-available-bytes - before-available-bytes`). |
+| `cleanup-profile`        | Normalized cleanup profile actually used (`max` or `custom`).   |
+| `executed-components`    | Comma-separated component names scheduled for execution.        |
+
+Example: write reclaimed space to the job summary.
+
+```yaml
+- name: Free Runner Space
+  id: free-space
+  uses: justinthelaw/maximize-github-runner-space@latest
+  with:
+    cleanup-profile: custom
+    remove-codeql: "true"
+
+- name: Publish cleanup summary
+  shell: bash
+  run: |
+    set -euo pipefail
+    echo "Reclaimed bytes: ${{ steps.free-space.outputs.reclaimed-bytes }}" >> "$GITHUB_STEP_SUMMARY"
+    echo "Executed components: ${{ steps.free-space.outputs.executed-components }}" >> "$GITHUB_STEP_SUMMARY"
+```
 
 ### Component toggles
 

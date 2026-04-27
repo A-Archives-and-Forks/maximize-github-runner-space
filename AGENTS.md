@@ -5,11 +5,12 @@
 - Composite GitHub Action that frees disk space on `ubuntu-latest` runners by removing optional preinstalled software and caches.
 - Main implementation lives in `action.yml` and is intended to run early in a workflow.
 - Supports `cleanup-profile` modes (`custom` and `max`), `skip-components` to keep specific toolchains, and an opt-in `swapfile-size` input to manage `/mnt/swapfile` without changing it by default.
+- Exposes structured outputs for `/` disk availability before/after cleanup, reclaimed bytes, normalized cleanup profile, and the scheduled component list.
 
 ## Repository Map
 
 - `action.yml`: Action metadata, inputs, and all cleanup logic.
-- `.github/workflows/test.yml`: CI matrix tests; each run enables exactly one removal input and verifies expected state.
+- `.github/workflows/test.yml`: CI matrix tests; each run enables exactly one removal input and verifies expected state, plus output-contract checks for `custom` and `max`.
 - `README.md`: User-facing usage and caveats.
 
 ## Scripts / Execution Surfaces

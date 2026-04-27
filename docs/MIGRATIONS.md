@@ -4,7 +4,24 @@ This document captures breaking changes and notable behavior shifts between rele
 
 ## Table of Contents
 
+- [0.7.x -> 0.8.0](#07x---080)
 - [0.6.x -> 0.7.0](#06x---070)
+
+## 0.7.x -> 0.8.0
+
+**Summary**
+
+`maximize-github-runner-space` now emits stable machine-readable outputs for disk-space reporting and cleanup planning.
+
+**Behavior changes**
+
+- Added composite action outputs:
+  - `before-available-bytes`
+  - `after-available-bytes`
+  - `reclaimed-bytes`
+  - `cleanup-profile`
+  - `executed-components`
+- Output behavior is observational only and does not change cleanup/removal semantics.
 
 ## 0.6.x -> 0.7.0
 
